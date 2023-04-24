@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=sudo sed -i 's#-w 1280 -h 800 \\#-w 1920 -h 1080 -f \\\n\t--force-orientation left \\#;s#STEAM_DISPLAY_REFRESH_LIMITS=40,60#STEAM_DISPLAY_REFRESH_LIMITS=45,60#' /usr/bin/gamescope-session ;  systemctl --user --wait start gamescope-session
+GenericName[en_US]=
+GenericName=
+Icon=system-run
+MimeType=
+Name[en_US]=gamescope-for-airplus
+Name=gamescope-for-airplus
+Path=/usr/bin
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=

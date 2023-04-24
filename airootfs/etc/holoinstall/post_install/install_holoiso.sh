@@ -352,6 +352,8 @@ full_install() {
 	arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
 	echo "Cleaning up..."
 	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
+	cp /etc/skel/Desktop/gamescope-for-airplus.desktop ${HOLO_INSTALL_DIR}/etc/skel/Desktop
+	cp /etc/skel/Desktop/gamescope-for-airplus.desktop ${HOLO_INSTALL_DIR}/home/${HOLOUSER}/Desktop
     arch-chroot ${HOLO_INSTALL_DIR} rm -rf /etc/holoinstall
 	sleep 1
 	clear
