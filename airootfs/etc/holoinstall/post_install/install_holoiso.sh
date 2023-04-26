@@ -210,11 +210,11 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	else
 		efiStart=$(parted ${DEVICE} unit MB print free|tail -n2|sed s/'        '//|cut -c1-$digitMB|sed s/MB//|sed s/' '//g)
 	fi
-	efiEnd=$(expr $efiStart + 256)
+	efiEnd=$(expr $efiStart + 300)
 	rootStart=$efiEnd
-	rootEnd=$(expr $rootStart + 24000)
+	rootEnd=$(expr $rootStart + 24576)
 	swapStart=$rootEnd
-	swapEnd=$(expr $swapStart + 32000)
+	swapEnd=$(expr $swapStart + 32768)
 
 	if [ $efiEnd -gt $realDiskSpace ]; then
 		echo "Not enough space available, please choose another disk and try again"
