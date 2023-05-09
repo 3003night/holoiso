@@ -193,7 +193,8 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 
 	efiPartNum=$(expr $numPartitions + 1)
 	rootPartNum=$(expr $numPartitions + 2)
-	homePartNum=$(expr $numPartitions + 3)
+	swapPartNum=$(expr $numPartitions + 3)
+	homePartNum=$(expr $numPartitions + 4)
 
 	echo "\nCalculating start and end of free space..."
 	diskSpace=$(awk '/'${DRIVEDEVICE}'/ {print $3; exit}' /proc/partitions)
@@ -216,9 +217,11 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	else
 		efiStart=$(parted ${DEVICE} unit MB print free|tail -n2|sed s/'        '//|cut -c1-$digitMB|sed s/MB//|sed s/' '//g)
 	fi
-	efiEnd=$(expr $efiStart + 256)
+	efiEnd=$(expr $efiStart + 300)
 	rootStart=$efiEnd
-	rootEnd=$(expr $rootStart + 24000)
+	rootEnd=$(expr $rootStart + 24 \* 1024)
+	swapStart=$rootEnd
+	swapEnd=$(expr $swapStart + 32 \* 1024)
 
 	if [ $efiEnd -gt $realDiskSpace ]; then
 		echo "Not enough space available, please choose another disk and try again"
@@ -227,17 +230,18 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	fi
 
 	echo "\nCreating partitions..."
-	parted ${DEVICE} mkpart primary fat32 ${efiStart}M ${efiEnd}M
+	parted ${DEVICE} mkpart primary fat32 ${efiStart}MiB ${efiEnd}MiB
 	parted ${DEVICE} set ${efiPartNum} boot on
 	parted ${DEVICE} set ${efiPartNum} esp on
 	# If the available storage is less than 64GB, don't create /home.
 	# If the boot device is mmcblk0, don't create an ext4 partition or it will break steamOS versions
 	# released after May 20.
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
-		parted ${DEVICE} mkpart primary btrfs ${rootStart}M 100%
+		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB 100%
 	else
-		parted ${DEVICE} mkpart primary btrfs ${rootStart}M ${rootEnd}M
-		parted ${DEVICE} mkpart primary ext4 ${rootEnd}M 100%
+		parted ${DEVICE} mkpart primary btrfs ${rootStart}M ${rootEnd}MiB
+		parted ${DEVICE} mkpart primary linux-swap ${swapStart}MiB ${swapEnd}MiB
+		parted ${DEVICE} mkpart primary ext4 ${swapEnd}M 100%
 		home=true
 	fi
 	root_partition="${INSTALLDEVICE}${rootPartNum}"
@@ -246,6 +250,10 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	fatlabel ${INSTALLDEVICE}${efiPartNum} HOLOEFI
 	mkfs -t btrfs -f ${root_partition}
 	btrfs filesystem label ${root_partition} holo-root
+	swap_partition="${INSTALLDEVICE}${swapPartNum}"
+	mkswap ${swap_partition}
+	swapon ${swap_partition}
+	swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
 	if [ $home ]; then
 		if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
 				if [[ "${HOME_REUSE_TYPE}" == "1" ]]; then
@@ -287,6 +295,7 @@ base_os_install() {
 	cp -r /etc/holoinstall/post_install/pacman.conf ${HOLO_INSTALL_DIR}/etc/pacman.conf
 	arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
     arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
 	arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
     arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs | grep pkg.tar.zst)
 
@@ -319,6 +328,8 @@ base_os_install() {
 
 	echo "\nInstalling bootloader..."
 	mkdir -p ${HOLO_INSTALL_DIR}/boot/efi
+	echo "GRUB_CMDLINE_LINUX_DEFAULT='video=efifb fbcon=rotate:1 resume=UUID=${swap_uuid} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0'" >> ${HOLO_INSTALL_DIR}/etc/default/grub 
+	echo "GRUB_TIMEOUT=5" >> ${HOLO_INSTALL_DIR}/etc/default/grub
 	mount -t vfat ${efi_partition} ${HOLO_INSTALL_DIR}/boot/efi
 	arch-chroot ${HOLO_INSTALL_DIR} holoiso-grub-update
 	mount -o remount,rw -t efivarfs efivarfs /sys/firmware/efi/efivars
@@ -335,6 +346,7 @@ full_install() {
 		echo "You're running this on a Steam Deck. linux-firmware-neptune will be installed to ensure maximum kernel-side compatibility."
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-firmware
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs_addon | grep linux-firmware-neptune)
+		arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
 		arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
 	fi
 	echo "\nConfiguring Steam Deck UI by default..."		
@@ -342,6 +354,7 @@ full_install() {
 	echo -e "[General]\nDisplayServer=wayland\n\n[Autologin]\nUser=${HOLOUSER}\nSession=gamescope-wayland.desktop\nRelogin=true\n\n[X11]\n# Janky workaround for wayland sessions not stopping in sddm, kills\n# all active sddm-helper sessions on teardown\nDisplayStopCommand=/usr/bin/gamescope-wayland-teardown-workaround" >> ${HOLO_INSTALL_DIR}/etc/sddm.conf.d/autologin.conf
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G rfkill ${HOLOUSER}
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G wheel ${HOLOUSER}
+	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G input ${HOLOUSER}
 	echo "Preparing Steam OOBE..."
 	arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
 	echo "Cleaning up..."
