@@ -245,7 +245,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 		home=true
 	fi
 	root_partition="${INSTALLDEVICE}${rootPartNum}"
-	mkfs -t vfat ${INSTALLDEVICE}${efiPartNum}
+	mkfs -t vfat -F 32 ${INSTALLDEVICE}${efiPartNum}
 	efi_partition="${INSTALLDEVICE}${efiPartNum}"
 	fatlabel ${INSTALLDEVICE}${efiPartNum} HOLOEFI
 	mkfs -t btrfs -f ${root_partition}
