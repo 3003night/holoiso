@@ -219,7 +219,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	fi
 	efiEnd=$(expr $efiStart + 300)
 	rootStart=$efiEnd
-	rootEnd=$(expr $rootStart + 24 \* 1024)
+	rootEnd=$(expr $rootStart + 20 \* 1024)
 	swapStart=$rootEnd
 	swapEnd=$(expr $swapStart + 32 \* 1024)
 
@@ -239,9 +239,9 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
 		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB 100%
 	else
-		parted ${DEVICE} mkpart primary btrfs ${rootStart}M ${rootEnd}MiB
+		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB ${rootEnd}MiB
 		parted ${DEVICE} mkpart primary linux-swap ${swapStart}MiB ${swapEnd}MiB
-		parted ${DEVICE} mkpart primary ext4 ${swapEnd}M 100%
+		parted ${DEVICE} mkpart primary ext4 ${swapEnd}MiB 100%
 		home=true
 	fi
 	root_partition="${INSTALLDEVICE}${rootPartNum}"
@@ -328,8 +328,8 @@ base_os_install() {
 
 	echo "\nInstalling bootloader..."
 	mkdir -p ${HOLO_INSTALL_DIR}/boot/efi
-	echo "GRUB_CMDLINE_LINUX_DEFAULT='video=efifb fbcon=rotate:1 resume=UUID=${swap_uuid} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0'" >> ${HOLO_INSTALL_DIR}/etc/default/grub 
-	echo "GRUB_TIMEOUT=5" >> ${HOLO_INSTALL_DIR}/etc/default/grub
+	# echo "GRUB_CMDLINE_LINUX_DEFAULT='video=efifb fbcon=rotate:1 resume=UUID=${swap_uuid} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0'" >> ${HOLO_INSTALL_DIR}/etc/default/grub 
+	# echo "GRUB_TIMEOUT=5" >> ${HOLO_INSTALL_DIR}/etc/default/grub
 	mount -t vfat ${efi_partition} ${HOLO_INSTALL_DIR}/boot/efi
 	arch-chroot ${HOLO_INSTALL_DIR} holoiso-grub-update
 	mount -o remount,rw -t efivarfs efivarfs /sys/firmware/efi/efivars
