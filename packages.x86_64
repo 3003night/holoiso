@@ -259,7 +259,6 @@ zip
 grub-btrfs
 os-prober
 snapper
-update-grub
 gparted
 expac
 fcitx5
