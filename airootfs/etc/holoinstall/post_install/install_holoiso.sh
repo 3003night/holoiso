@@ -253,8 +253,9 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	swap_partition="${INSTALLDEVICE}${swapPartNum}"
 	mkswap ${swap_partition}
 	swapon ${swap_partition}
-	swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
+	# swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
 	if [ $home ]; then
+		# reuse home partition if it exists
 		if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
 				if [[ "${HOME_REUSE_TYPE}" == "1" ]]; then
 					mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
@@ -280,7 +281,11 @@ base_os_install() {
 	echo "${UCODE_INSTALL_MSG}"
 	sleep 1
 	clear
-	mount -t btrfs -o subvol=/,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR} 
+	mount -t btrfs -o subvol=/,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}
+	btrfs subvolume create ${HOLO_INSTALL_DIR}/@
+	btrfs subvolume create ${HOLO_INSTALL_DIR}/@snapshots
+	umount ${HOLO_INSTALL_DIR}
+	mount -t btrfs -o subvol=@,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}
 	check_mount $? root
 	${CMD_MOUNT_BOOT}
 	check_mount $? boot
@@ -328,12 +333,11 @@ base_os_install() {
 
 	echo "\nInstalling bootloader..."
 	mkdir -p ${HOLO_INSTALL_DIR}/boot/efi
-	# echo "GRUB_CMDLINE_LINUX_DEFAULT='video=efifb fbcon=rotate:1 resume=UUID=${swap_uuid} quiet splash loglevel=3 rd.udev.log_priority=3 vt.global_cursor_default=0'" >> ${HOLO_INSTALL_DIR}/etc/default/grub 
-	# echo "GRUB_TIMEOUT=5" >> ${HOLO_INSTALL_DIR}/etc/default/grub
 	mount -t vfat ${efi_partition} ${HOLO_INSTALL_DIR}/boot/efi
 	arch-chroot ${HOLO_INSTALL_DIR} holoiso-grub-update
 	mount -o remount,rw -t efivarfs efivarfs /sys/firmware/efi/efivars
-	arch-chroot ${HOLO_INSTALL_DIR} efibootmgr -c -d ${DEVICE} -p ${efiPartNum} -L "HoloISO" -l '\EFI\BOOT\BOOTX64.efi'
+	# arch-chroot ${HOLO_INSTALL_DIR} efibootmgr -c -d ${DEVICE} -p ${efiPartNum} -L "HoloISO" -l '\EFI\BOOT\BOOTX64.efi'
+	arch-chroot ${HOLO_INSTALL_DIR} grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=SteamOS --recheck
 	sleep 1
 	clear
 }

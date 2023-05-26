@@ -254,3 +254,20 @@ xorg-xhost
 xorg-xwininfo
 xterm
 zip
+
+# add 
+grub-btrfs
+os-prober
+snapper
+update-grub
+gparted
+expac
+fcitx5
+fcitx5-chinese-addons
+fcitx5-configtool
+fcitx5-gtk
+fcitx5-material-color
+fcitx5-pinyin-zhwiki
+fcitx5-qt
+llvm
+llvm-libs
