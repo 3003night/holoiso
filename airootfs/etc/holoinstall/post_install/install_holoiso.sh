@@ -283,12 +283,12 @@ base_os_install() {
 	clear
 	mount -t btrfs -o subvol=/,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}
 	btrfs subvolume create ${HOLO_INSTALL_DIR}/@
+	btrfs subvolume set-default $(btrfs subvolume list ${HOLO_INSTALL_DIR} | grep '@$' | awk '{print $2}') ${HOLO_INSTALL_DIR}
 	btrfs subvolume create ${HOLO_INSTALL_DIR}/@snapshots
-	btrfs subvolume set-default $(btrfs subvolume list ${HOLO_INSTALL_DIR} | grep '@' | awk '{print $2}') ${HOLO_INSTALL_DIR}
 	umount ${HOLO_INSTALL_DIR}
 	mount -t btrfs -o subvol=@,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}
 	mkdir -p ${HOLO_INSTALL_DIR}/.snapshots
-	mount -t btrfs -o subvol=@snapshots,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}/.snapshots
+	mount -t btrfs -o subvol=@snapshots,compress-force=zstd:1,discard,noatime,nodiratime,nofail ${root_partition} ${HOLO_INSTALL_DIR}/.snapshots
 	check_mount $? root
 	${CMD_MOUNT_BOOT}
 	check_mount $? boot
