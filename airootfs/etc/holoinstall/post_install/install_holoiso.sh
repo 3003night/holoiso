@@ -254,21 +254,39 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	mkswap ${swap_partition}
 	swapon ${swap_partition}
 	# swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
+
+	# Setup home partition ext4 or btrfs
+	if [[ $home && "x${HOME_REUSE_TYPE}" != "x2" ]]; then
+		HOMETYPE=$(zenity --list --title="Choose your home partition type:" --column="Type" --column="Name" 1 "ext4" \2 "btrfs"  --width=500 --height=220)
+	fi
+
 	if [ $home ]; then
 		# reuse home partition if it exists
 		if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
 				if [[ "${HOME_REUSE_TYPE}" == "1" ]]; then
-					mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
-					home_partition="${INSTALLDEVICE}${homePartNum}"
-					e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+					if [[ "${HOMETYPE}" == "1" ]]; then
+						mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
+						home_partition="${INSTALLDEVICE}${homePartNum}"
+						e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+					elif [[ "${HOMETYPE}" == "2" ]]; then
+						mkfs -t btrfs -f ${INSTALLDEVICE}${homePartNum}
+						home_partition="${INSTALLDEVICE}${homePartNum}"
+						btrfs filesystem label ${home_partition} holo-home
+					fi
 				elif [[ "${HOME_REUSE_TYPE}" == "2" ]]; then
 					echo "Home partition will be reused at $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)"
                     home_partition="$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)"
 				fi
 		else
-			mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
-			home_partition="${INSTALLDEVICE}${homePartNum}"
-			e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+			if [[ "${HOMETYPE}" == "1" ]]; then
+				mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
+				home_partition="${INSTALLDEVICE}${homePartNum}"
+				e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+			elif [[ "${HOMETYPE}" == "2" ]]; then
+				mkfs -t btrfs -f ${INSTALLDEVICE}${homePartNum}
+				home_partition="${INSTALLDEVICE}${homePartNum}"
+				btrfs filesystem label ${home_partition} holo-home
+			fi
 		fi
 	fi
 	echo "\nPartitioning complete, mounting and installing."
@@ -294,7 +312,18 @@ base_os_install() {
 	check_mount $? boot
 	if [ $home ]; then
         mkdir -p ${HOLO_INSTALL_DIR}/home
-		mount -t ext4 ${home_partition} ${HOLO_INSTALL_DIR}/home
+		if [[ "${HOMETYPE}" == "1" ]]; then
+			mount -t ext4 ${home_partition} ${HOLO_INSTALL_DIR}/home
+		elif [[ "${HOMETYPE}" == "2" ]]; then
+			mount -t btrfs -o subvol=/,compress-force=zstd:1,discard,noatime,nodiratime ${home_partition} ${HOLO_INSTALL_DIR}/home
+			btrfs subvolume create ${HOLO_INSTALL_DIR}/home/@home
+			btrfs subvolume set-default $(btrfs subvolume list ${HOLO_INSTALL_DIR}/home | grep '@home$' | awk '{print $2}') ${HOLO_INSTALL_DIR}/home
+			btrfs subvolume create ${HOLO_INSTALL_DIR}/home/@snapshots
+			umount ${HOLO_INSTALL_DIR}/home
+			mount -t btrfs -o subvol=@home,compress-force=zstd:1,discard,noatime,nodiratime ${home_partition} ${HOLO_INSTALL_DIR}/home
+			mkdir -p ${HOLO_INSTALL_DIR}/home/.snapshots
+			mount -t btrfs -o subvol=@snapshots,compress-force=zstd:1,discard,noatime,nodiratime,nofail ${home_partition} ${HOLO_INSTALL_DIR}/home/.snapshots
+		fi
 		check_mount $? home
 	fi
     rsync -axHAWXS --numeric-ids --info=progress2 --no-inc-recursive / ${HOLO_INSTALL_DIR} |    tr '\r' '\n' |    awk '/^ / { print int(+$2) ; next } $0 { print "# " $0 }' | zenity --progress --title="Installing base OS..." --text="Bootstrapping root filesystem...\nThis may take more than 10 minutes.\n" --width=500 --no-cancel --auto-close
