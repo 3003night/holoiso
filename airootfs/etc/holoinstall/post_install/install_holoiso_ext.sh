@@ -15,45 +15,57 @@ fi
 
 check_mount(){
 	if [ $1 != 0 ]; then
-		echo "\nError: Something went wrong when mounting $2 partitions. Please try again!\n"
-		echo 'Press any key to exit...'; read -k1 -s
+		echo "\n错误: 挂载分区 $2 时出现问题。请重试!\n"
+		echo '按任意键退出...'; read -k1 -s
 		exit 1
 	fi
 }
 
 check_download(){
 	if [ $1 != 0 ]; then
-		echo "\nError: Something went wrong when $2.\nPlease make sure you have a stable internet connection!\n"
-		echo 'Press any key to exit...'; read -k1 -s
+		echo "\n错误: 在 $2 时发生了一些问题。\n请确保您的网络连接稳定!\n"
+		echo '按任意键退出...'; read -k1 -s
 		exit 1
 	fi
 }
 
 partitioning(){
-	echo "Select your drive in popup:"
+	echo "在对话框中选择您的磁盘驱动器:"
 
 	DRIVEDEVICE=$(lsblk -d -o NAME | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
-xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Select your disk to install HoloISO in below:\n\n $(lsblk -d -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,VENDOR,MODEL,SERIAL,MOUNTPOINT)" \
---radiolist --multiple --column ' ' --column 'Disks')
+xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="请在下方选择要安装HoloISO的磁盘:\n\n $(lsblk -d -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,VENDOR,MODEL,SERIAL,MOUNTPOINT)" \
+--radiolist --multiple --column ' ' --column '磁盘')
 	
 	DEVICE="/dev/${DRIVEDEVICE}"
 	
 	INSTALLDEVICE="${DEVICE}"
 
 	if [ ! -b $DEVICE ]; then
-		echo "$DEVICE not found! Installation Aborted!"
+		echo "未找到 $DEVICE! 安装已中止!"
 		exit 1
 	fi
 	lsblk $DEVICE | head -n2 | tail -n1 | grep disk > /dev/null 2>&1
 	if [ $? != 0 ]; then
-		echo "$DEVICE is not disk type! Installation Aborted!"
-		echo "\nNote: If you wish to perform partitioned installation,\nPlease specify the disk drive node first then select \"2\" for partition install."
+		echo "$DEVICE 不是磁盘类型! 安装已中止!"
+		echo "\n注意: 如果您想进行分区安装,\n请先指定磁盘驱动器节点, 然后选择\"2\"进行分区安装."
 		exit 1
 	fi
-	echo "\nChoose your partitioning type:"
-	install=$(zenity --list --title="Choose your installation type:" --column="Type" --column="Name" 1 "Erase entire drive" \2 "Install alongside existing OS/Partition (Requires at least 50 GB of free space from the end)"  --width=700 --height=220)
+	echo "\n选择您的分区类型:"
+	install=$(zenity --list --title="选择您的分区类型:" --column="Type" --column="Name" 1 "擦除整个驱动器" \2 "保留现有的操作系统/分区旁边安装(至少需要50GB的末尾空闲空间)" \3 "擦除一个现有分区安装(分区大小至少需要50GB)"  --width=700 --height=320)
+	# if install is 3
+	if [[ $install = "3" ]]; then
+		echo "在对话框中选择要覆盖的分区:"
+	fi
+
+	OVERWRITE_DEVICE=$(lsblk -rno NAME,SIZE,FSTYPE,LABEL ${DEVICE} | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
+xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="请在下方选择要覆盖安装HoloISO的分区:" \
+--radiolist --multiple --column ' ' --column '分区')
+	OVERWRITE_DEVICE=$(awk '{print $1}' <<< $OVERWRITE_DEVICE)
+	# last number of the device name
+	OVERWRITE_DEVICE_SER=$(echo $OVERWRITE_DEVICE | sed 's/.*\([0-9]\+\)$/\1/')
+
 	if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
-		HOME_REUSE_TYPE=$(zenity --list --title="Warning" --text="HoloISO home partition was detected at $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1). Please select an appropriate action below:" --column="Type" --column="Name" 1 "Format it and start over" \2 "Reuse partition"  --width=500 --height=220)
+		HOME_REUSE_TYPE=$(zenity --list --title="警告" --text="在 $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1) 检测到HoloISO home分区. 请在下方选择适当的操作:" --column="Type" --column="Name" 1 "重新进行格式化安装" \2 "重复使用分区"  --width=500 --height=220)
 		mkdir -p /tmp/home
 		mount $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1) /tmp/home
 		mkdir -p /tmp/rootpart
@@ -93,32 +105,32 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 					umount -l $(sudo blkid | grep holo-root | cut -d ':' -f 1 | head -n 1)
 				fi
 	fi
-	# Setup password for root
+	# 设置root密码
 	while true; do
-		ROOTPASS=$(zenity --forms --title="Account configuration" --text="Set root/system administrator password" --add-password="Password for user root")
+		ROOTPASS=$(zenity --forms --title="账户配置" --text="设置 root 密码" --add-password="root用户密码")
 		if [ -z $ROOTPASS ]; then
 			zenity --warning --text "No password was set for user \"root\"!" --width=300
 			break
 		fi
 		echo
-		ROOTPASS_CONF=$(zenity --forms --title="Account configuration" --text="Confirm your root password" --add-password="Password for user root")
+		ROOTPASS_CONF=$(zenity --forms --title="账户配置" --text="确认 root 密码" --add-password="root用户密码")
 		echo
 		if [ $ROOTPASS = $ROOTPASS_CONF ]; then
 			break
 		fi
-		zenity --warning --text "Passwords not match." --width=300
+		zenity --warning --text "前后密码不匹配." --width=300
 	done
-	# Create user
+	# 创建用户
 	NAME_REGEX="^[a-z][-a-z0-9_]*\$"
 	if [ -z $MIGRATEDINSTALL ]; then
 	while true; do
-		HOLOUSER=$(zenity --entry --title="Account creation" --text "Enter username for this installation:")
+		HOLOUSER=$(zenity --entry --title="账户创建" --text "输入用户名:")
 		if [ $HOLOUSER = "root" ]; then
-			zenity --warning --text "User root already exists." --width=300
+			zenity --warning --text "root用户已存在." --width=300
 		elif [ -z $HOLOUSER ]; then
-			zenity --warning --text "Please create a user!" --width=300
+			zenity --warning --text "清创建用户!" --width=300
 		elif [ ${#HOLOUSER} -gt 32 ]; then
-			zenity --warning --text "Username length must not exceed 32 characters!" --width=400
+			zenity --warning --text "用户名长度不能超过32个字符!" --width=400
 		elif [[ ! $HOLOUSER =~ $NAME_REGEX ]]; then
 			zenity --warning --text "Invalid username \"$HOLOUSER\"\nUsername needs to follow these rules:\n\n- Must start with a lowercase letter.\n- May only contain lowercase letters, digits, hyphens, and underscores." --width=500
 		else
@@ -126,20 +138,20 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 		fi
 	done
 	fi
-	# Setup password for user
+	# 设置用户密码
 	while true; do
-		HOLOPASS=$(zenity --forms --title="Account configuration" --text="Set password for $HOLOUSER" --add-password="Password for user $HOLOUSER")
+		HOLOPASS=$(zenity --forms --title="账户配置" --text="设置用户 $HOLOUSER 的密码" --add-password="用户 $HOLOUSER 的密码")
 		echo
-		HOLOPASS_CONF=$(zenity --forms --title="Account configuration" --text="Confirm password for $HOLOUSER" --add-password="Password for user $HOLOUSER")
+		HOLOPASS_CONF=$(zenity --forms --title="账户配置" --text="确认用户 $HOLOUSER 的密码" --add-password="用户 $HOLOUSER 的密码")
 		echo
 		if [ -z $HOLOPASS ]; then
-			zenity --warning --text "Please type password for user \"$HOLOUSER\"!" --width=300
+			zenity --warning --text "请输入用户 \"$HOLOUSER\" 的密码!" --width=300
 			HOLOPASS_CONF=unmatched
 		fi
 		if [ $HOLOPASS = $HOLOPASS_CONF ]; then
 			break
 		fi
-		zenity --warning --text "Passwords do not match." --width=300
+		zenity --warning --text "前后密码不匹配." --width=300
 	done
 	case $install in
 		1)
@@ -148,36 +160,48 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 			umount $INSTALLDEVICE* > /dev/null 2>&1
 			umount $INSTALLDEVICE* > /dev/null 2>&1
 			$INST_MSG1
-			if zenity --question --text "WARNING: The following drive is going to be fully erased. ALL DATA ON DRIVE ${DEVICE} WILL BE LOST! \n\n$(lsblk -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,VENDOR,MODEL,SERIAL,MOUNTPOINT ${DEVICE} | sed "1d")\n\nErase ${DEVICE} and begin installation?" --width=700
+			if zenity --question --text "警告: 以下驱动器将被完全擦除。驱动器${DEVICE}上的所有数据将丢失! \n\n$(lsblk -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,VENDOR,MODEL,SERIAL,MOUNTPOINT ${DEVICE} | sed "1d")\n\n擦除 ${DEVICE} 并开始安装?" --width=700
 			then
-				echo "\nWiping partitions..."
+				echo "\n擦除分区中..."
 				sfdisk --delete ${DEVICE}
 				wipefs -a ${DEVICE}
-				echo "\nCreating new gpt partitions..."
+				echo "\n创建新的GPT分区..."
 				parted ${DEVICE} mklabel gpt
 			else
-				echo "\nNothing has been written.\nYou canceled the destructive install, please try again"
-				echo 'Press any key to exit...'; read -k1 -s
+				echo "\n还没有写入任何内容。\n您取消了破坏性的安装, 请重试。"
+				echo '按任意键退出...'; read -k1 -s
 				exit 1
 			fi
 			;;
 		2)
-			echo "\nHoloISO will be installed alongside existing OS/Partition.\nPlease make sure there are more than 24 GB on the >>END<< of free(unallocate) space available\n"
+			echo "\nHoloISO将会与现有的操作系统/分区一同安装。\n请确保在磁盘>>末尾<<处有超过24GB的空闲(未分配)空间可用\n"
 			parted $DEVICE print free
-			echo "HoloISO will be installed on the following free (unallocated) space.\n"
+			echo "HoloISO将被安装在以下空闲(未分配)空间上.\n"
 			parted $DEVICE print free | tail -n2 | grep "Free Space"
 			if [ $? != 0 ]; then
-				echo "Error! No Free Space found on the end of the disk.\nNothing has been written.\nYou canceled the non-destructive install, please try again"
+				echo "错误！在磁盘末尾未找到可用空间。\n还没有写入任何内容, \n您取消了非破坏性安装, 请重试"
 				exit 1
-				echo 'Press any key to exit...'; read -k1 -s
+				echo '按任意键退出...'; read -k1 -s
 			fi
 				$INST_MSG1
-			if zenity --question --text "HoloISO will be installed on the following free (unallocated) space.\nDoes this look reasonable?\n$(sudo parted ${DEVICE} print free | tail -n2 | grep "Free Space")" --width=500
+			if zenity --question --text "HoloISO将安装在以下空闲(未分配)空间上。\n这看起来没问题吗?\n$(sudo parted ${DEVICE} print free | tail -n2 | grep "Free Space")" --width=500
 			then
-        		echo "\nBeginning installation..."
+        		echo "\n开始安装..."
 			else
-				echo "\nNothing has been written.\nYou canceled the non-destructive install, please try again"
-				echo 'Press any key to exit...'; read -k1 -s
+				echo "\n没有写入任何内容, \n您取消了非破坏性安装, 请重试"
+				echo '按任意键退出...'; read -k1 -s
+				exit 1
+        		fi
+			;;
+		3)
+			overwriter_partition=true
+			echo "\nHoloISO将覆盖安装在以下分区的空间上 /dev/${OVERWRITE_DEVICE}"
+			if zenity --question --text "HoloISO将覆盖安装在以下分区的空间上，原分区数据将会擦除。\n确定吗?\n$(sudo lsblk -f /dev/${OVERWRITE_DEVICE})" --width=500
+			then
+        		echo "\n开始安装..."
+			else
+				echo "\n没有写入任何内容, \n您取消了非破坏性安装, 请重试"
+				echo '按任意键退出...'; read -k1 -s
 				exit 1
         		fi
 			;;
@@ -191,31 +215,41 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 		numPartitions=$(grep -c ${DRIVEDEVICE}p /proc/partitions)
 	fi
 
+	if [ overwriter_partition ]; then
+		numPartitions=$(expr $OVERWRITE_DEVICE_SER - 1)
+	fi
+
 	efiPartNum=$(expr $numPartitions + 1)
 	rootPartNum=$(expr $numPartitions + 2)
 	swapPartNum=$(expr $numPartitions + 3)
 	homePartNum=$(expr $numPartitions + 4)
 
-	echo "\nCalculating start and end of free space..."
-	diskSpace=$(awk '/'${DRIVEDEVICE}'/ {print $3; exit}' /proc/partitions)
+	# echo "\n计算空闲空间..."
+	# diskSpace=$(awk '/'${DRIVEDEVICE}'/ {print $3; exit}' /proc/partitions)
 	# <= 60GB: typical flash drive
-	if [ $diskSpace -lt 60000000 ]; then
-		digitMB=8
-		realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 16-20)
-	# <= 500GB: typical 512GB hard drive
-	elif [ $diskSpace -lt 500000000 ]; then
-		digitMB=8
-		realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 20-25)
-	# anything else: typical 1024GB hard drive
-	else
-		digitMB=9
-		realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 20-26)
-	fi
+	# if [ $diskSpace -lt 60000000 ]; then
+	# 	digitMiB=9
+	# 	# realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 16-20)
+	# # <= 500GB: typical 512GB hard drive
+	# elif [ $diskSpace -lt 500000000 ]; then
+	# 	digitMiB=9
+	# 	# realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 20-25)
+	# # anything else: typical 1024GB hard drive
+	# else
+	# 	digitMiB=10
+	# 	# realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 20-26)
+	# fi
 
 	if [ $destructive ]; then
 		efiStart=2
 	else
-		efiStart=$(parted ${DEVICE} unit MB print free|tail -n2|sed s/'        '//|cut -c1-$digitMB|sed s/MB//|sed s/' '//g)
+		if [ overwriter_partition ]; then
+			efiStart=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $2}'|sed s/MiB//|sed s/' '//g)
+			homeEnd=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $3}'|sed s/MiB//|sed s/' '//g)
+		else
+			# efiStart=$(parted ${DEVICE} unit MiB print free|tail -n2|sed s/'        '//|cut -c1-$digitMiB|sed s/MiB//|sed s/' '//g)
+			efiStart=$(sudo parted ${DEVICE} unit MiB print free|tail -n2|awk '{print $1}'|sed s/MiB//|sed s/' '//g)
+		fi
 	fi
 	efiEnd=$(expr $efiStart + 300)
 	rootStart=$efiEnd
@@ -223,25 +257,34 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	swapStart=$rootEnd
 	swapEnd=$(expr $swapStart + 32 \* 1024)
 
-	if [ $efiEnd -gt $realDiskSpace ]; then
-		echo "Not enough space available, please choose another disk and try again"
-		exit 1
-		echo 'Press any key to exit...'; read -k1 -s
-	fi
+	# if [ $efiEnd -gt $realDiskSpace ]; then
+	# 	echo "Not enough space available, please choose another disk and try again"
+	# 	exit 1
+	# 	echo '按任意键退出...'; read -k1 -s
+	# fi
 
 	echo "\nCreating partitions..."
-	parted ${DEVICE} mkpart primary fat32 ${efiStart}MiB ${efiEnd}MiB
-	parted ${DEVICE} set ${efiPartNum} boot on
-	parted ${DEVICE} set ${efiPartNum} esp on
+	if [ overwriter_partition ]; then
+		echo "Overwriting partition /dev/${OVERWRITE_DEVICE}"
+		parted ${DEVICE} rm ${OVERWRITE_DEVICE_SER}
+	fi
+
+	parted --script ${DEVICE} mkpart primary fat32 ${efiStart}MiB ${efiEnd}MiB
+	parted --script ${DEVICE} set ${efiPartNum} boot on
+	parted --script ${DEVICE} set ${efiPartNum} esp on
 	# If the available storage is less than 64GB, don't create /home.
 	# If the boot device is mmcblk0, don't create an ext4 partition or it will break steamOS versions
 	# released after May 20.
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
 		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB 100%
 	else
-		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB ${rootEnd}MiB
-		parted ${DEVICE} mkpart primary linux-swap ${swapStart}MiB ${swapEnd}MiB
-		parted ${DEVICE} mkpart primary ext4 ${swapEnd}MiB 100%
+		parted --script ${DEVICE} mkpart primary btrfs ${rootStart}MiB ${rootEnd}MiB
+		parted --script ${DEVICE} mkpart primary linux-swap ${swapStart}MiB ${swapEnd}MiB
+		if [ $homeEnd ]; then
+			parted --script ${DEVICE} mkpart primary ext4 ${swapEnd}MiB ${homeEnd}MiB
+		else
+			parted --script ${DEVICE} mkpart primary ext4 ${swapEnd}MiB 100%
+		fi
 		home=true
 	fi
 	root_partition="${INSTALLDEVICE}${rootPartNum}"
@@ -257,7 +300,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 
 	# Setup home partition ext4 or btrfs
 	if [[ $home && "x${HOME_REUSE_TYPE}" != "x2" ]]; then
-		HOMETYPE=$(zenity --list --title="Choose your home partition type:" --column="Type" --column="Name" 1 "ext4" \2 "btrfs"  --width=500 --height=220)
+		HOMETYPE=$(zenity --list --title="选择 home 分区格式:" --column="Type" --column="Name" 1 "ext4" \2 "btrfs"  --width=500 --height=320)
 	fi
 
 	if [ $home ]; then
@@ -420,6 +463,7 @@ full_install() {
 echo "SteamOS 3 Installer"
 echo "Start time: $(date)"
 echo "Please choose installation type:"
+export LANG=en_US.UTF-8
 HOLO_INSTALL_TYPE=$(zenity --list --title="Choose your installation type:" --column="Type" --column="Name" 1 "Install HoloISO, version $(cat /etc/os-release | grep VARIANT_ID | cut -d "=" -f 2 | sed 's/"//g') " \2 "Exit installer"  --width=700 --height=220)
 if [[ "${HOLO_INSTALL_TYPE}" == "1" ]] || [[ "${HOLO_INSTALL_TYPE}" == "barebones" ]]; then
 	echo "Installing SteamOS, barebones configuration..."
