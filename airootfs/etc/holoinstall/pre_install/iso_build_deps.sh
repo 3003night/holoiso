@@ -30,6 +30,9 @@ usermod -a -G rfkill ${LIVEOSUSER}
 usermod -a -G wheel ${LIVEOSUSER}
 # Begin coreOS bootstrapping below:
 
+sed -i 's/#zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/g' /etc/locale.gen
+locale-gen
+
 # Init pacman keys
 pacman-key --init
 pacman -Sy

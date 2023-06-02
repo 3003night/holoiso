@@ -473,7 +473,7 @@ full_install() {
 	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
     arch-chroot ${HOLO_INSTALL_DIR} rm -rf /etc/holoinstall
 	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/zh_CN.UTF-8/en_US.UTF-8/g' /etc/locale.conf
-	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_CN.UTF-8 UTF-8/zh_US.UTF-8 UTF-8/g' /etc/locale.gen
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/g' /etc/locale.gen
 	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_TW.UTF-8 UTF-8/zh_TW.UTF-8 UTF-8/g' /etc/locale.gen
 	arch-chroot ${HOLO_INSTALL_DIR} locale-gen
 	sleep 1
