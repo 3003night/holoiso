@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=sudo /etc/holoinstall/post_install/install_holoiso_ext.sh
+GenericName[en_US]=
+GenericName=
+Icon=run-install
+MimeType=
+Name[en_US]=Ext Install SteamOS on this machine
+Name=Ext Installs HoloISO on this device 
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=

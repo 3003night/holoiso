@@ -17,5 +17,6 @@ file_permissions=(
   ["/etc/skel/Desktop/ime-kb.desktop"]="0:0:755"
   ["/etc/skel/Desktop/chroot.desktop"]="0:0:755"
   ["/etc/skel/Desktop/install.desktop"]="0:0:755"
+  ["/etc/skel/Desktop/install-ext.desktop"]="0:0:755"
 )
 locales=("en_US.UTF-8" "zh_CN.UTF-8")
