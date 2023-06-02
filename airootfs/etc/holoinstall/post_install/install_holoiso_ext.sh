@@ -29,12 +29,32 @@ check_download(){
 	fi
 }
 
+parted_mkpart() {
+	DEVICE=$1
+	PARTITION_TYPE=$2
+	PARTITION_START=$3
+	PARTITION_END=$4
+
+	# if not end specified, use 100%
+	if [ -z $PARTITION_END ]; then
+		PARTITION_END="100%"
+	fi
+
+	init_devices=$(lsblk -rno PATH ${DEVICE})
+	parted --script ${DEVICE} mkpart primary ${PARTITION_TYPE} ${PARTITION_START} ${PARTITION_END}
+	current_devices=$(lsblk -rno PATH ${DEVICE})
+	new_device=$(comm -13 <(echo "$init_devices") <(echo "$current_devices"))
+	echo $new_device
+}
+
 partitioning(){
 	echo "在对话框中选择您的磁盘驱动器:"
 
-	DRIVEDEVICE=$(lsblk -d -o NAME | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
-xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="请在下方选择要安装HoloISO的磁盘:\n\n $(lsblk -d -o NAME,MAJ:MIN,RM,SIZE,RO,TYPE,VENDOR,MODEL,SERIAL,MOUNTPOINT)" \
+	DRIVEDEVICE=$(lsblk -d -o NAME,SIZE,MODEL | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
+xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="请在下方选择要安装HoloISO的磁盘:\n\n" \
 --radiolist --multiple --column ' ' --column '磁盘')
+
+	DRIVEDEVICE=$(awk '{print $1}' <<< $DRIVEDEVICE)
 	
 	DEVICE="/dev/${DRIVEDEVICE}"
 	
@@ -207,22 +227,24 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 			;;
 		esac
 
-	numPartitions=$(grep -c ${DRIVEDEVICE}'[0-9]' /proc/partitions)
+	# numPartitions=$(grep -c ${DRIVEDEVICE}'[0-9]' /proc/partitions)
 	
 	echo ${DEVICE} | grep -q -P "^/dev/(nvme|loop|mmcblk)"
 	if [ $? -eq 0 ]; then
 		INSTALLDEVICE="${DEVICE}p"
-		numPartitions=$(grep -c ${DRIVEDEVICE}p /proc/partitions)
+		# numPartitions=$(grep -c ${DRIVEDEVICE}p /proc/partitions)
 	fi
 
-	if [ overwriter_partition ]; then
-		numPartitions=$(expr $OVERWRITE_DEVICE_SER - 1)
-	fi
-
-	efiPartNum=$(expr $numPartitions + 1)
-	rootPartNum=$(expr $numPartitions + 2)
-	swapPartNum=$(expr $numPartitions + 3)
-	homePartNum=$(expr $numPartitions + 4)
+	# if [ overwriter_partition ]; then
+	# 	# numPartitions=$(expr $OVERWRITE_DEVICE_SER - 1)
+	# 	efiPartNum=$OVERWRITE_DEVICE_SER
+	# else
+	# 	efiPartNum=$(expr $numPartitions + 1)
+	# fi
+	
+	# rootPartNum=$(expr $numPartitions + 2)
+	# swapPartNum=$(expr $numPartitions + 3)
+	# homePartNum=$(expr $numPartitions + 4)
 
 	# echo "\n计算空闲空间..."
 	# diskSpace=$(awk '/'${DRIVEDEVICE}'/ {print $3; exit}' /proc/partitions)
@@ -269,31 +291,29 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 		parted ${DEVICE} rm ${OVERWRITE_DEVICE_SER}
 	fi
 
-	parted --script ${DEVICE} mkpart primary fat32 ${efiStart}MiB ${efiEnd}MiB
+	efi_partition=$(parted_mkpart ${DEVICE} fat32 ${efiStart}MiB ${efiEnd}MiB)
 	parted --script ${DEVICE} set ${efiPartNum} boot on
 	parted --script ${DEVICE} set ${efiPartNum} esp on
 	# If the available storage is less than 64GB, don't create /home.
 	# If the boot device is mmcblk0, don't create an ext4 partition or it will break steamOS versions
 	# released after May 20.
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
-		parted ${DEVICE} mkpart primary btrfs ${rootStart}MiB 100%
+		root_partition=$(parted_mkpart ${DEVICE} btrfs ${rootStart}MiB 100%)
 	else
-		parted --script ${DEVICE} mkpart primary btrfs ${rootStart}MiB ${rootEnd}MiB
-		parted --script ${DEVICE} mkpart primary linux-swap ${swapStart}MiB ${swapEnd}MiB
+		root_partition=$(parted_mkpart ${DEVICE} btrfs ${rootStart}MiB ${rootEnd}MiB)
+		swap_partition=$(parted_mkpart ${DEVICE} linux-swap ${swapStart}MiB ${swapEnd}MiB)
 		if [ $homeEnd ]; then
-			parted --script ${DEVICE} mkpart primary ext4 ${swapEnd}MiB ${homeEnd}MiB
+			home_partition=$(parted_mkpart ${DEVICE} ext4 ${swapEnd}MiB ${homeEnd}MiB)
 		else
-			parted --script ${DEVICE} mkpart primary ext4 ${swapEnd}MiB 100%
+			home_partition=$(parted_mkpart ${DEVICE} ext4 ${swapEnd}MiB "100%")
 		fi
 		home=true
 	fi
-	root_partition="${INSTALLDEVICE}${rootPartNum}"
-	mkfs -t vfat -F 32 ${INSTALLDEVICE}${efiPartNum}
-	efi_partition="${INSTALLDEVICE}${efiPartNum}"
-	fatlabel ${INSTALLDEVICE}${efiPartNum} HOLOEFI
+
+	mkfs -t vfat -F 32 ${efi_partition}
+	fatlabel ${efi_partition} HOLOEFI
 	mkfs -t btrfs -f ${root_partition}
 	btrfs filesystem label ${root_partition} holo-root
-	swap_partition="${INSTALLDEVICE}${swapPartNum}"
 	mkswap ${swap_partition}
 	swapon ${swap_partition}
 	# swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
@@ -308,12 +328,10 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 		if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
 				if [[ "${HOME_REUSE_TYPE}" == "1" ]]; then
 					if [[ "${HOMETYPE}" == "1" ]]; then
-						mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
-						home_partition="${INSTALLDEVICE}${homePartNum}"
-						e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+						mkfs -t ext4 -F -O casefold ${home_partition}
+						e2label "${home_partition}" holo-home
 					elif [[ "${HOMETYPE}" == "2" ]]; then
-						mkfs -t btrfs -f ${INSTALLDEVICE}${homePartNum}
-						home_partition="${INSTALLDEVICE}${homePartNum}"
+						mkfs -t btrfs -f ${home_partition}
 						btrfs filesystem label ${home_partition} holo-home
 					fi
 				elif [[ "${HOME_REUSE_TYPE}" == "2" ]]; then
@@ -322,18 +340,18 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 				fi
 		else
 			if [[ "${HOMETYPE}" == "1" ]]; then
-				mkfs -t ext4 -F -O casefold ${INSTALLDEVICE}${homePartNum}
-				home_partition="${INSTALLDEVICE}${homePartNum}"
-				e2label "${INSTALLDEVICE}${homePartNum}" holo-home
+				mkfs -t ext4 -F -O casefold ${home_partition}
+				e2label "${home_partition}" holo-home
 			elif [[ "${HOMETYPE}" == "2" ]]; then
-				mkfs -t btrfs -f ${INSTALLDEVICE}${homePartNum}
-				home_partition="${INSTALLDEVICE}${homePartNum}"
+				mkfs -t btrfs -f ${home_partition}
 				btrfs filesystem label ${home_partition} holo-home
 			fi
 		fi
 	fi
 	echo "\nPartitioning complete, mounting and installing."
 }
+
+
 
 base_os_install() {
 	sleep 1
@@ -454,6 +472,10 @@ full_install() {
 	echo "Cleaning up..."
 	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
     arch-chroot ${HOLO_INSTALL_DIR} rm -rf /etc/holoinstall
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/zh_CN.UTF-8/en_US.UTF-8/g' /etc/locale.conf
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_CN.UTF-8 UTF-8/zh_US.UTF-8 UTF-8/g' /etc/locale.gen
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_TW.UTF-8 UTF-8/zh_TW.UTF-8 UTF-8/g' /etc/locale.gen
+	arch-chroot ${HOLO_INSTALL_DIR} locale-gen
 	sleep 1
 	clear
 }
