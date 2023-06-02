@@ -42,6 +42,7 @@ parted_mkpart() {
 
 	init_devices=$(lsblk -rno PATH ${DEVICE})
 	parted --script ${DEVICE} mkpart primary ${PARTITION_TYPE} ${PARTITION_START} ${PARTITION_END}
+	sleep 1
 	current_devices=$(lsblk -rno PATH ${DEVICE})
 	new_device=$(comm -13 <(echo "$init_devices") <(echo "$current_devices"))
 	echo $new_device
@@ -292,6 +293,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 	fi
 
 	efi_partition=$(parted_mkpart ${DEVICE} fat32 ${efiStart}MiB ${efiEnd}MiB)
+	efiPartNum=$(echo $efi_partition | grep -o '[0-9]*$')
 	parted --script ${DEVICE} set ${efiPartNum} boot on
 	parted --script ${DEVICE} set ${efiPartNum} esp on
 	# If the available storage is less than 64GB, don't create /home.
@@ -300,8 +302,8 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
 		root_partition=$(parted_mkpart ${DEVICE} btrfs ${rootStart}MiB 100%)
 	else
-		root_partition=$(parted_mkpart ${DEVICE} btrfs ${rootStart}MiB ${rootEnd}MiB)
-		swap_partition=$(parted_mkpart ${DEVICE} linux-swap ${swapStart}MiB ${swapEnd}MiB)
+		root_partition=$(parted_mkpart ${DEVICE} btrfs "${rootStart}MiB" "${rootEnd}MiB")
+		swap_partition=$(parted_mkpart ${DEVICE} linux-swap "${swapStart}MiB" "${swapEnd}MiB")
 		if [ $homeEnd ]; then
 			home_partition=$(parted_mkpart ${DEVICE} ext4 ${swapEnd}MiB ${homeEnd}MiB)
 		else
