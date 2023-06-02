@@ -15,7 +15,7 @@ chmod 755 /etc/skel/Desktop/install.desktop
 rm /home/${LIVEOSUSER}/steam.desktop
 
 # Add a liveOS user
-ROOTPASS="holoconfig"
+ROOTPASS="123"
 LIVEOSUSER="liveuser"
 
 echo -e "${ROOTPASS}\n${ROOTPASS}" | passwd root
@@ -67,3 +67,6 @@ rm -rf /etc/holoinstall/pre_install
 rm /etc/pacman.conf
 mv /etc/pacold /etc/pacman.conf
 rm /home/.steamos/offload/var/cache/pacman/pkg/*
+
+ln -sf /usr/bin/vim /usr/bin/vi
+sed -i 's/set mouse=a/set mouse-=a/g' /usr/share/vim/vim90/defaults.vim

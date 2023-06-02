@@ -325,6 +325,10 @@ base_os_install() {
 			mount -t btrfs -o subvol=@snapshots,compress-force=zstd:1,discard,noatime,nodiratime,nofail ${home_partition} ${HOLO_INSTALL_DIR}/home/.snapshots
 		fi
 		check_mount $? home
+	else
+		mkdir -p ${HOLO_INSTALL_DIR}/home
+		btrfs subvolume create ${HOLO_INSTALL_DIR}/@home
+		mount -t btrfs -o subvol=@home,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}/home
 	fi
     rsync -axHAWXS --numeric-ids --info=progress2 --no-inc-recursive / ${HOLO_INSTALL_DIR} |    tr '\r' '\n' |    awk '/^ / { print int(+$2) ; next } $0 { print "# " $0 }' | zenity --progress --title="Installing base OS..." --text="Bootstrapping root filesystem...\nThis may take more than 10 minutes.\n" --width=500 --no-cancel --auto-close
 	arch-chroot ${HOLO_INSTALL_DIR} install -Dm644 "$(find /usr/lib | grep vmlinuz | grep neptune)" "/boot/vmlinuz-$(cat /usr/lib/modules/*neptune*/pkgbase)"
@@ -341,12 +345,12 @@ base_os_install() {
 	sleep 2
 	clear
 	
-	sleep 1
-	clear
-	echo "\nBase system installation done, generating fstab..."
-	genfstab -U -p /mnt >> /mnt/etc/fstab
-	sleep 1
-	clear
+	# sleep 1
+	# clear
+	# echo "\nBase system installation done, generating fstab..."
+	# genfstab -U -p /mnt >> /mnt/etc/fstab
+	# sleep 1
+	# clear
 
     echo "Configuring first boot user accounts..."
 	rm ${HOLO_INSTALL_DIR}/etc/skel/Desktop/*
@@ -360,6 +364,10 @@ base_os_install() {
 	echo "${HOLOUSER} ALL=(root) NOPASSWD:ALL" > ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
 	chmod 0440 ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
 	echo "127.0.1.1    ${HOLOHOSTNAME}" >> ${HOLO_INSTALL_DIR}/etc/hosts
+
+	arch-chroot ${HOLO_INSTALL_DIR} ln -sf /usr/bin/vim /usr/bin/vi
+	arch-chroot ${HOLO_INSTALL_DIR} rm -f /etc/zsh/zshrc
+	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/set mouse=a/set mouse-=a/g' /usr/share/vim/vim90/defaults.vim
 	sleep 1
 	clear
 
@@ -370,6 +378,13 @@ base_os_install() {
 	mount -o remount,rw -t efivarfs efivarfs /sys/firmware/efi/efivars
 	# arch-chroot ${HOLO_INSTALL_DIR} efibootmgr -c -d ${DEVICE} -p ${efiPartNum} -L "HoloISO" -l '\EFI\BOOT\BOOTX64.efi'
 	arch-chroot ${HOLO_INSTALL_DIR} grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=SteamOS --recheck
+	sleep 1
+	clear
+
+	sleep 1
+	clear
+	echo "\nBase system installation done, generating fstab..."
+	genfstab -U -p /mnt >> /mnt/etc/fstab
 	sleep 1
 	clear
 }
