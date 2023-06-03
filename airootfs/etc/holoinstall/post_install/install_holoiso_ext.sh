@@ -73,8 +73,17 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 	fi
 	echo "\n选择您的分区类型:"
 	install=$(zenity --list --title="选择您的分区类型:" --column="Type" --column="Name" 1 "擦除整个驱动器" \2 "安装到未分配空闲空间(至少需要50GB的空闲空间)" \3 "擦除一个现有分区安装(分区大小至少需要50GB)"  --width=700 --height=320)
-	# if install is 3
-	if [[ $install = "3" ]]; then
+	
+	# 安装方式
+	if [[ $install = "2" ]]; then
+		echo "在对话框中选择要安装的位置:"
+
+		FREE_SPACE=$(sudo parted ${DEVICE} unit MiB print free | grep "Free Space" | sed "s/       //" | awk '{ printf "FALSE""\0"$0"\0" }' | \
+		xargs -0 zenity --list --width=600 --height=530 --title="选择安装位置" --text="请在下方选择要安装HoloISO的位置:\n\n$(sudo parted ${DEVICE} unit MiB print free | sed '1,6d')" \
+		--radiolist --multiple --column ' ' --column '未分配空间')
+		FREE_SPACE_START=$(echo $FREE_SPACE | awk '{print $1}' | sed 's/MiB//')
+		FREE_SPACE_END=$(echo $FREE_SPACE | awk '{print $2}' | sed 's/MiB//')
+	elif [[ $install = "3" ]]; then
 		echo "在对话框中选择要覆盖的分区:"
 
 		OVERWRITE_DEVICE=$(lsblk -rno NAME,SIZE,FSTYPE,LABEL ${DEVICE} | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
@@ -84,14 +93,6 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 		OVERWRITE_DEVICE=$(awk '{print $1}' <<< $OVERWRITE_DEVICE)
 		# last number of the device name
 		OVERWRITE_DEVICE_SER=$(echo $OVERWRITE_DEVICE | sed 's/.*\([0-9]\+\)$/\1/')
-	elif [[ $install = "2" ]]; then
-		echo "在对话框中选择要安装的位置:"
-
-		FREE_SPACE=$(sudo parted ${DEVICE} unit MiB print free | grep "Free Space" | sed "s/       //" | awk '{ printf "FALSE""\0"$0"\0" }' | \
-		xargs -0 zenity --list --width=600 --height=530 --title="选择安装位置" --text="请在下方选择要安装HoloISO的位置:\n\n$(sudo parted ${DEVICE} unit MiB print free | sed '1,6d')" \
-		--radiolist --multiple --column ' ' --column '未分配空间')
-		FREE_SPACE_START=$(echo $FREE_SPACE | awk '{print $1}' | sed 's/MiB//')
-		FREE_SPACE_END=$(echo $FREE_SPACE | awk '{print $2}' | sed 's/MiB//')
 	fi
 
 	if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
@@ -222,10 +223,10 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 				echo "\n没有写入任何内容, \n您取消了非破坏性安装, 请重试"
 				echo '按任意键退出...'; read -k1 -s
 				exit 1
-        		fi
+        	fi
 			;;
 		3)
-			overwriter_partition=true
+			# overwriter_partition=true
 			echo "\nHoloISO将覆盖安装在以下分区的空间上 /dev/${OVERWRITE_DEVICE}"
 			if zenity --question --text "HoloISO将覆盖安装在以下分区的空间上，原分区数据将会擦除。\n确定吗?\n$(sudo lsblk -f /dev/${OVERWRITE_DEVICE})" --width=500
 			then
@@ -234,7 +235,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 				echo "\n没有写入任何内容, \n您取消了非破坏性安装, 请重试"
 				echo '按任意键退出...'; read -k1 -s
 				exit 1
-        		fi
+        	fi
 			;;
 	esac
 
@@ -311,14 +312,16 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 	# 	echo '按任意键退出...'; read -k1 -s
 	# fi
 
-	echo "\n创建分区..."
-	if [ overwriter_partition ]; then
+	echo "\n创建分区...\ninstall:${install}"
+	if [[ ${install} == "3" ]]; then
 		echo "Overwriting partition /dev/${OVERWRITE_DEVICE}"
 		parted ${DEVICE} rm ${OVERWRITE_DEVICE_SER}
 	fi
 
 	efi_partition=$(parted_mkpart ${DEVICE} fat32 ${efiStart}MiB ${efiEnd}MiB)
-	efiPartNum=$(echo $efi_partition | grep -o '[0-9]*$')
+	echo "EFI分区: ${efi_partition}"
+	efiPartNum=$(echo ${efi_partition} | grep -o '[0-9]*$')
+	echo "EFI分区号: ${efiPartNum}"
 	parted --script ${DEVICE} set ${efiPartNum} boot on
 	parted --script ${DEVICE} set ${efiPartNum} esp on
 	# If the available storage is less than 64GB, don't create /home.
@@ -326,14 +329,18 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 	# released after May 20.
 	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
 		root_partition=$(parted_mkpart ${DEVICE} btrfs ${rootStart}MiB 100%)
+		echo "Root分区: ${root_partition}"
 	else
 		root_partition=$(parted_mkpart ${DEVICE} btrfs "${rootStart}MiB" "${rootEnd}MiB")
+		echo "Root分区: ${root_partition}"
 		swap_partition=$(parted_mkpart ${DEVICE} linux-swap "${swapStart}MiB" "${swapEnd}MiB")
+		echo "Swap分区: ${swap_partition}"
 		if [ $homeEnd ]; then
 			home_partition=$(parted_mkpart ${DEVICE} ext4 ${swapEnd}MiB ${homeEnd}MiB)
 		else
 			home_partition=$(parted_mkpart ${DEVICE} ext4 ${swapEnd}MiB "100%")
 		fi
+		echo "Home分区: ${home_partition}"
 		home=true
 	fi
 
