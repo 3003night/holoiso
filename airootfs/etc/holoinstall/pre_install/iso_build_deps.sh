@@ -52,6 +52,7 @@ systemctl enable sddm NetworkManager systemd-timesyncd cups bluetooth sshd
 
 # Download extra stuff
 mkdir -p /etc/holoinstall/post_install/pkgs
+mkdir -p /etc/holoinstall/post_install/pkgs_addon
 wget $(pacman -Sp win600-xpad-dkms) -P /etc/holoinstall/post_install/pkgs_addon
 wget $(pacman -Sp linux-firmware-neptune) -P /etc/holoinstall/post_install/pkgs_addon
 
