@@ -30,10 +30,10 @@ check_download(){
 }
 
 parted_mkpart() {
-    DEVICE=$1
-    PARTITION_TYPE=$2
-    PARTITION_START=$3
-    PARTITION_END=$4
+    local DEVICE=$1
+    local PARTITION_TYPE=$2
+    local PARTITION_START=$3
+    local PARTITION_END=$4
 
     # if not end specified, use 100%
     if [ -z $PARTITION_END ]; then
@@ -338,7 +338,8 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
     btrfs filesystem label ${root_partition} holo-root
     mkswap ${swap_partition}
     swapon ${swap_partition}
-    # swap_uuid="$(blkid ${swap_partition} -o value -s UUID)"
+
+    SWAP_PARTUUID="$(blkid ${swap_partition} -o value -s PARTUUID)"
 
     # Setup home partition ext4 or btrfs
     if [[ $home && "x${HOME_REUSE_TYPE}" != "x2" ]]; then
@@ -467,6 +468,9 @@ base_os_install() {
     arch-chroot ${HOLO_INSTALL_DIR} install -Dm644 "$(find /usr/lib | grep vmlinuz | grep neptune)" "/boot/vmlinuz-$(cat /usr/lib/modules/*neptune*/pkgbase)"
     arch-chroot ${HOLO_INSTALL_DIR} rm /etc/polkit-1/rules.d/99_holoiso_installuser.rules
     cp -r /etc/holoinstall/post_install/pacman.conf ${HOLO_INSTALL_DIR}/etc/pacman.conf
+
+	arch-chroot ${HOLO_INSTALL_DIR} echo "${SWAP_PARTUUID}" > /etc/default/auto_swap
+
     arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
     arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
     arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
@@ -477,11 +481,11 @@ base_os_install() {
     check_download $? "installing base package"
     sleep 2
     clear
-    
-    # sleep 1
-    # clear
-    # echo "\nBase system installation done, generating fstab..."
-    # genfstab -U -p /mnt >> /mnt/etc/fstab
+
+	sleep 1
+    clear
+    echo "\n基本系统安装完成，正在生成fstab文件..."
+    genfstab -U -p /mnt >> /mnt/etc/fstab
     # sleep 1
     # clear
 
@@ -498,9 +502,14 @@ base_os_install() {
     chmod 0440 ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
     echo "127.0.1.1    ${HOLOHOSTNAME}" >> ${HOLO_INSTALL_DIR}/etc/hosts
 
+	echo "配置系统..."
     arch-chroot ${HOLO_INSTALL_DIR} ln -sf /usr/bin/vim /usr/bin/vi
     arch-chroot ${HOLO_INSTALL_DIR} rm -f /etc/zsh/zshrc
     arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/set mouse=a/set mouse-=a/g' /usr/share/vim/vim90/defaults.vim
+
+	arch-chroot ${HOLO_INSTALL_DIR} systemctl enable sk-auto-swap.service
+	arch-chroot ${HOLO_INSTALL_DIR} systemctl enable sk-efi-mount.service
+
     sleep 1
     clear
 
@@ -514,12 +523,7 @@ base_os_install() {
     sleep 1
     clear
 
-    sleep 1
-    clear
-    echo "\n基本系统安装完成，正在生成fstab文件..."
-    genfstab -U -p /mnt >> /mnt/etc/fstab
-    sleep 1
-    clear
+
 }
 full_install() {
     if [[ "${GAMEPAD_DRV}" == "1" ]]; then
