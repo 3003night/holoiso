@@ -72,18 +72,27 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
 		exit 1
 	fi
 	echo "\n选择您的分区类型:"
-	install=$(zenity --list --title="选择您的分区类型:" --column="Type" --column="Name" 1 "擦除整个驱动器" \2 "保留现有的操作系统/分区旁边安装(至少需要50GB的末尾空闲空间)" \3 "擦除一个现有分区安装(分区大小至少需要50GB)"  --width=700 --height=320)
+	install=$(zenity --list --title="选择您的分区类型:" --column="Type" --column="Name" 1 "擦除整个驱动器" \2 "安装到未分配空闲空间(至少需要50GB的空闲空间)" \3 "擦除一个现有分区安装(分区大小至少需要50GB)"  --width=700 --height=320)
 	# if install is 3
 	if [[ $install = "3" ]]; then
 		echo "在对话框中选择要覆盖的分区:"
-	fi
 
-	OVERWRITE_DEVICE=$(lsblk -rno NAME,SIZE,FSTYPE,LABEL ${DEVICE} | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
-xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="请在下方选择要覆盖安装HoloISO的分区:" \
---radiolist --multiple --column ' ' --column '分区')
-	OVERWRITE_DEVICE=$(awk '{print $1}' <<< $OVERWRITE_DEVICE)
-	# last number of the device name
-	OVERWRITE_DEVICE_SER=$(echo $OVERWRITE_DEVICE | sed 's/.*\([0-9]\+\)$/\1/')
+		OVERWRITE_DEVICE=$(lsblk -rno NAME,SIZE,FSTYPE,LABEL ${DEVICE} | sed "1d" | awk '{ printf "FALSE""\0"$0"\0" }' | \
+		xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="请在下方选择要覆盖安装HoloISO的分区:" \
+		--radiolist --multiple --column ' ' --column '分区')
+
+		OVERWRITE_DEVICE=$(awk '{print $1}' <<< $OVERWRITE_DEVICE)
+		# last number of the device name
+		OVERWRITE_DEVICE_SER=$(echo $OVERWRITE_DEVICE | sed 's/.*\([0-9]\+\)$/\1/')
+	elif [[ $install = "2" ]]; then
+		echo "在对话框中选择要安装的位置:"
+
+		FREE_SPACE=$(sudo parted ${DEVICE} unit MiB print free | grep "Free Space" | sed "s/       //" | awk '{ printf "FALSE""\0"$0"\0" }' | \
+		xargs -0 zenity --list --width=600 --height=530 --title="选择安装位置" --text="请在下方选择要安装HoloISO的位置:\n\n$(sudo parted ${DEVICE} unit MiB print free | sed '1,6d')" \
+		--radiolist --multiple --column ' ' --column '未分配空间')
+		FREE_SPACE_START=$(echo $FREE_SPACE | awk '{print $1}' | sed 's/MiB//')
+		FREE_SPACE_END=$(echo $FREE_SPACE | awk '{print $2}' | sed 's/MiB//')
+	fi
 
 	if [[ -n "$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" ]]; then
 		HOME_REUSE_TYPE=$(zenity --list --title="警告" --text="在 $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1) 检测到HoloISO home分区. 请在下方选择适当的操作:" --column="Type" --column="Name" 1 "重新进行格式化安装" \2 "重复使用分区"  --width=500 --height=220)
@@ -176,7 +185,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 	done
 	case $install in
 		1)
-			destructive=true
+			# destructive=true
 			# Umount twice to fully umount the broken install of steam os 3 before installing.
 			umount $INSTALLDEVICE* > /dev/null 2>&1
 			umount $INSTALLDEVICE* > /dev/null 2>&1
@@ -195,17 +204,18 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 			fi
 			;;
 		2)
-			echo "\nHoloISO将会与现有的操作系统/分区一同安装。\n请确保在磁盘>>末尾<<处有超过24GB的空闲(未分配)空间可用\n"
+			# overwriter_partition=true
+			echo "\nHoloISO将会与现有的操作系统/分区一同安装。\n请确保选择的未分配空间超过50GB\n"
 			parted $DEVICE print free
 			echo "HoloISO将被安装在以下空闲(未分配)空间上.\n"
-			parted $DEVICE print free | tail -n2 | grep "Free Space"
+			parted ${DEVICE} unit MiB print free | grep "Free Space" | grep ${FREE_SPACE_START}
 			if [ $? != 0 ]; then
 				echo "错误！在磁盘末尾未找到可用空间。\n还没有写入任何内容, \n您取消了非破坏性安装, 请重试"
 				exit 1
 				echo '按任意键退出...'; read -k1 -s
 			fi
 				$INST_MSG1
-			if zenity --question --text "HoloISO将安装在以下空闲(未分配)空间上。\n这看起来没问题吗?\n$(sudo parted ${DEVICE} print free | tail -n2 | grep "Free Space")" --width=500
+			if zenity --question --text "HoloISO将安装在以下空闲(未分配)空间上。\n这看起来没问题吗?\n$(sudo parted ${DEVICE} unit MiB print free | grep "Free Space" | grep ${FREE_SPACE_START})" --width=500
 			then
         		echo "\n开始安装..."
 			else
@@ -226,7 +236,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 				exit 1
         		fi
 			;;
-		esac
+	esac
 
 	# numPartitions=$(grep -c ${DRIVEDEVICE}'[0-9]' /proc/partitions)
 	
@@ -263,17 +273,32 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 	# 	# realDiskSpace=$(parted ${DEVICE} unit MB print free|head -n2|tail -n1|cut -c 20-26)
 	# fi
 
-	if [ $destructive ]; then
-		efiStart=2
-	else
-		if [ overwriter_partition ]; then
+	# if [ $destructive ]; then
+	# 	efiStart=2
+	# else
+	# 	if [ overwriter_partition ]; then
+	# 		efiStart=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $2}'|sed s/MiB//|sed s/' '//g)
+	# 		homeEnd=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $3}'|sed s/MiB//|sed s/' '//g)
+	# 	else
+	# 		# efiStart=$(parted ${DEVICE} unit MiB print free|tail -n2|sed s/'        '//|cut -c1-$digitMiB|sed s/MiB//|sed s/' '//g)
+	# 		efiStart=$(sudo parted ${DEVICE} unit MiB print free|tail -n2|awk '{print $1}'|sed s/MiB//|sed s/' '//g)
+	# 	fi
+	# fi
+
+	case $install in
+		1)
+			efiStart=2
+			;;
+		2)
+			efiStart=$FREE_SPACE_START
+			homeEnd=$FREE_SPACE_END
+			;;
+		3)
 			efiStart=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $2}'|sed s/MiB//|sed s/' '//g)
 			homeEnd=$(sudo parted ${DEVICE} unit MiB print|awk '$1 == "'$OVERWRITE_DEVICE_SER'" {print $3}'|sed s/MiB//|sed s/' '//g)
-		else
-			# efiStart=$(parted ${DEVICE} unit MiB print free|tail -n2|sed s/'        '//|cut -c1-$digitMiB|sed s/MiB//|sed s/' '//g)
-			efiStart=$(sudo parted ${DEVICE} unit MiB print free|tail -n2|awk '{print $1}'|sed s/MiB//|sed s/' '//g)
-		fi
-	fi
+			;;
+	esac
+
 	efiEnd=$(expr $efiStart + 300)
 	rootStart=$efiEnd
 	rootEnd=$(expr $rootStart + 20 \* 1024)
