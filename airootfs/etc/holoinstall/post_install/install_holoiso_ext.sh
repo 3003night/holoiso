@@ -121,7 +121,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 					rsync -axHAWXS --numeric-ids --info=progress2 --no-inc-recursive /tmp/rootpart/var/lib/flatpak /tmp/home/.steamos/offload/var/lib/ |    tr '\r' '\n' |    awk '/^ / { print int(+$2) ; next } $0 { print "# " $0 }'
 					echo "Finished."
 					) |
-					zenity --progress --title="Preparing to reuse home at $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" --text="Your installation will reuse following user: ${HOLOUSER} \n\nStarting to move following directories to target offload:\n\n- /opt\n- /root\n- /srv\n- /usr/lib/debug\n- /usr/local\n- /var/cache/pacman\n- /var/lib/docker\n- /var/lib/systemd/coredump\n- /var/log\n- /var/tmp\n" --width=500 --no-cancel --percentage=0 --auto-close
+					zenity --progress --title="为复用home分区进行准备中 $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)" --text="Your installation will reuse following user: ${HOLOUSER} \n\nStarting to move following directories to target offload:\n\n- /opt\n- /root\n- /srv\n- /usr/lib/debug\n- /usr/local\n- /var/cache/pacman\n- /var/lib/docker\n- /var/lib/systemd/coredump\n- /var/log\n- /var/tmp\n" --width=500 --no-cancel --percentage=0 --auto-close
 					umount -l $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)
 					umount -l $(sudo blkid | grep holo-root | cut -d ':' -f 1 | head -n 1)
 				fi
@@ -286,7 +286,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 	# 	echo '按任意键退出...'; read -k1 -s
 	# fi
 
-	echo "\nCreating partitions..."
+	echo "\n创建分区..."
 	if [ overwriter_partition ]; then
 		echo "Overwriting partition /dev/${OVERWRITE_DEVICE}"
 		parted ${DEVICE} rm ${OVERWRITE_DEVICE_SER}
@@ -337,7 +337,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 						btrfs filesystem label ${home_partition} holo-home
 					fi
 				elif [[ "${HOME_REUSE_TYPE}" == "2" ]]; then
-					echo "Home partition will be reused at $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)"
+					echo "Home 分区将复用 $(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)"
                     home_partition="$(sudo blkid | grep holo-home | cut -d ':' -f 1 | head -n 1)"
 				fi
 		else
@@ -350,7 +350,7 @@ xargs -0 zenity --list --width=600 --height=530 --title="选择分区" --text="�
 			fi
 		fi
 	fi
-	echo "\nPartitioning complete, mounting and installing."
+	echo "\n分区创建完毕，开始挂载并安装系统."
 }
 
 
@@ -393,7 +393,7 @@ base_os_install() {
 		btrfs subvolume create ${HOLO_INSTALL_DIR}/@home
 		mount -t btrfs -o subvol=@home,compress-force=zstd:1,discard,noatime,nodiratime ${root_partition} ${HOLO_INSTALL_DIR}/home
 	fi
-    rsync -axHAWXS --numeric-ids --info=progress2 --no-inc-recursive / ${HOLO_INSTALL_DIR} |    tr '\r' '\n' |    awk '/^ / { print int(+$2) ; next } $0 { print "# " $0 }' | zenity --progress --title="Installing base OS..." --text="Bootstrapping root filesystem...\nThis may take more than 10 minutes.\n" --width=500 --no-cancel --auto-close
+    rsync -axHAWXS --numeric-ids --info=progress2 --no-inc-recursive / ${HOLO_INSTALL_DIR} |    tr '\r' '\n' |    awk '/^ / { print int(+$2) ; next } $0 { print "# " $0 }' | zenity --progress --title="安装基本系统..." --text="引导启动根文件系统...\n这可能需要超过10分钟.\n" --width=500 --no-cancel --auto-close
 	arch-chroot ${HOLO_INSTALL_DIR} install -Dm644 "$(find /usr/lib | grep vmlinuz | grep neptune)" "/boot/vmlinuz-$(cat /usr/lib/modules/*neptune*/pkgbase)"
 	arch-chroot ${HOLO_INSTALL_DIR} rm /etc/polkit-1/rules.d/99_holoiso_installuser.rules
 	cp -r /etc/holoinstall/post_install/pacman.conf ${HOLO_INSTALL_DIR}/etc/pacman.conf
@@ -415,7 +415,7 @@ base_os_install() {
 	# sleep 1
 	# clear
 
-    echo "Configuring first boot user accounts..."
+    echo "配置首次启动的用户账户..."
 	rm ${HOLO_INSTALL_DIR}/etc/skel/Desktop/*
     arch-chroot ${HOLO_INSTALL_DIR} rm /etc/sddm.conf.d/* 
 	mv /etc/holoinstall/post_install_shortcuts/steam.desktop /etc/holoinstall/post_install_shortcuts/desktopshortcuts.desktop ${HOLO_INSTALL_DIR}/etc/xdg/autostart
@@ -434,7 +434,7 @@ base_os_install() {
 	sleep 1
 	clear
 
-	echo "\nInstalling bootloader..."
+	echo "\n安装引导程序..."
 	mkdir -p ${HOLO_INSTALL_DIR}/boot/efi
 	mount -t vfat ${efi_partition} ${HOLO_INSTALL_DIR}/boot/efi
 	arch-chroot ${HOLO_INSTALL_DIR} holoiso-grub-update
@@ -446,56 +446,59 @@ base_os_install() {
 
 	sleep 1
 	clear
-	echo "\nBase system installation done, generating fstab..."
+	echo "\n基本系统安装完成，正在生成fstab文件..."
 	genfstab -U -p /mnt >> /mnt/etc/fstab
 	sleep 1
 	clear
 }
 full_install() {
 	if [[ "${GAMEPAD_DRV}" == "1" ]]; then
-		echo "You're running this on Anbernic Win600. A suitable gamepad driver will be installed."
+		echo "您正在Anbernic Win600上运行此操作。将安装适用的游戏手柄驱动程序."
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs_addon | grep win600-xpad-dkms)
 	fi
 	if [[ "${FIRMWARE_INSTALL}" == "1" ]]; then
-		echo "You're running this on a Steam Deck. linux-firmware-neptune will be installed to ensure maximum kernel-side compatibility."
+		echo "您正在Steam Deck上运行此程序。将安装linux-firmware-neptune以确保最大的内核兼容性."
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-firmware
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs_addon | grep linux-firmware-neptune)
 		arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
 		arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
 	fi
-	echo "\nConfiguring Steam Deck UI by default..."		
+	echo "\n默认配置Steam Deck用户界面..."		
     ln -s /usr/share/applications/steam.desktop ${HOLO_INSTALL_DIR}/etc/skel/Desktop/steam.desktop
 	echo -e "[General]\nDisplayServer=wayland\n\n[Autologin]\nUser=${HOLOUSER}\nSession=gamescope-wayland.desktop\nRelogin=true\n\n[X11]\n# Janky workaround for wayland sessions not stopping in sddm, kills\n# all active sddm-helper sessions on teardown\nDisplayStopCommand=/usr/bin/gamescope-wayland-teardown-workaround" >> ${HOLO_INSTALL_DIR}/etc/sddm.conf.d/autologin.conf
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G rfkill ${HOLOUSER}
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G wheel ${HOLOUSER}
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G input ${HOLOUSER}
-	echo "Preparing Steam OOBE..."
-	arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
-	echo "Cleaning up..."
-	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
-    arch-chroot ${HOLO_INSTALL_DIR} rm -rf /etc/holoinstall
+	
 	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/zh_CN.UTF-8/en_US.UTF-8/g' /etc/locale.conf
 	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/g' /etc/locale.gen
 	arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/#zh_TW.UTF-8 UTF-8/zh_TW.UTF-8 UTF-8/g' /etc/locale.gen
 	arch-chroot ${HOLO_INSTALL_DIR} locale-gen
+
+
+	echo "准备 Steam OOBE..."
+	arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
+	echo "清理..."
+	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
+    arch-chroot ${HOLO_INSTALL_DIR} rm -rf /etc/holoinstall
 	sleep 1
 	clear
 }
 
 
 # The installer itself. Good wuck.
-echo "SteamOS 3 Installer"
-echo "Start time: $(date)"
-echo "Please choose installation type:"
+echo "SteamOS 3 安装程序"
+echo "开始时间: $(date)"
+echo "请选择安装类型:"
 export LANG=en_US.UTF-8
-HOLO_INSTALL_TYPE=$(zenity --list --title="Choose your installation type:" --column="Type" --column="Name" 1 "Install HoloISO, version $(cat /etc/os-release | grep VARIANT_ID | cut -d "=" -f 2 | sed 's/"//g') " \2 "Exit installer"  --width=700 --height=220)
+HOLO_INSTALL_TYPE=$(zenity --list --title="请选择安装类型:" --column="Type" --column="Name" 1 "安装 HoloISO, 版本 $(cat /etc/os-release | grep VARIANT_ID | cut -d "=" -f 2 | sed 's/"//g') " \2 "退出安装"  --width=700 --height=220)
 if [[ "${HOLO_INSTALL_TYPE}" == "1" ]] || [[ "${HOLO_INSTALL_TYPE}" == "barebones" ]]; then
-	echo "Installing SteamOS, barebones configuration..."
+	echo "安装SteamOS，基本配置..."
 	base_os_install
 	full_install
-	zenity --warning --text="Installation finished! You may reboot now, or type arch-chroot /mnt to make further changes" --width=700 --height=50
+	zenity --warning --text="安装完成！您现在可以重新启动，或者输入 arch-chroot /mnt 来进行进一步的更改。" --width=700 --height=50
 else
-	zenity --warning --text="Exiting installer..." --width=120 --height=50
+	zenity --warning --text="退出安装..." --width=120 --height=50
 fi
 
-echo "End time: $(date)"
+echo "结束时间: $(date)"
