@@ -389,13 +389,13 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
     done
     # 创建用户
     NAME_REGEX="^[a-z][-a-z0-9_]*\$"
-    if [ -z $MIGRATEDINSTALL ]; then
+    # if [ -z $MIGRATEDINSTALL ]; then
     while true; do
         HOLOUSER=$(zenity --entry --title="账户创建" --text "输入用户名:")
         if [ $HOLOUSER = "root" ]; then
             zenity --warning --text "root用户已存在." --width=300
         elif [ -z $HOLOUSER ]; then
-            zenity --warning --text "清创建用户!" --width=300
+            zenity --warning --text "请创建用户!" --width=300
         elif [ ${#HOLOUSER} -gt 32 ]; then
             zenity --warning --text "用户名长度不能超过32个字符!" --width=400
         elif [[ ! $HOLOUSER =~ $NAME_REGEX ]]; then
@@ -404,7 +404,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="选择磁盘" --text="�
             break
         fi
     done
-    fi
+    # fi
     # 设置用户密码
     while true; do
         HOLOPASS=$(zenity --forms --title="账户配置" --text="设置用户 $HOLOUSER 的密码" --add-password="用户 $HOLOUSER 的密码")
