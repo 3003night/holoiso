@@ -233,6 +233,7 @@ python-pyenchant
 python-pyinotify
 python-semantic-version
 python-yarl
+python-setuptools
 pyzy
 qt5-feedback
 renderdoc-minimal
