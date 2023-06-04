@@ -471,15 +471,6 @@ base_os_install() {
 
 	arch-chroot ${HOLO_INSTALL_DIR} echo "${SWAP_PARTUUID}" > /etc/default/auto_swap
 
-    arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
-    # arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm mkinitcpio-archiso
-    arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
-    arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
-    echo "安装软件包......"
-    # arch-chroot ${HOLO_INSTALL_DIR} rm -f $(find /etc/holoinstall/post_install/pkgs | grep linux-neptune)
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs | grep pkg.tar.zst)
-
     echo "删除liveuser......"
     arch-chroot ${HOLO_INSTALL_DIR} userdel -r liveuser
     check_download $? "installing base package"
@@ -527,6 +518,14 @@ base_os_install() {
     sleep 1
     clear
 
+    echo "安装软件包......"
+    arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
+    # arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm mkinitcpio-archiso
+    arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
+    arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
+    # arch-chroot ${HOLO_INSTALL_DIR} rm -f $(find /etc/holoinstall/post_install/pkgs | grep linux-neptune)
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs | grep pkg.tar.zst)
 
 }
 full_install() {
