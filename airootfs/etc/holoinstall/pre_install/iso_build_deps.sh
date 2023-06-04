@@ -11,6 +11,10 @@ chmod +x /etc/holoinstall/post_install/chroot_holoiso.sh
 chmod +x /etc/skel/Desktop/install.desktop
 chmod 755 /etc/skel/Desktop/install.desktop
 
+chmod +x /etc/holoinstall/post_install/install_holoiso_ext.sh
+chmod +x /etc/skel/Desktop/install-ext.desktop
+chmod 755 /etc/skel/Desktop/install-ext.desktop
+
 # Remove stupid stuff on build
 rm /home/${LIVEOSUSER}/steam.desktop
 
