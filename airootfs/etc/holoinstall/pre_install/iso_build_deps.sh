@@ -54,8 +54,11 @@ wget $(pacman -Sp win600-xpad-dkms) -P /etc/holoinstall/post_install/pkgs_addon
 wget $(pacman -Sp linux-firmware-neptune) -P /etc/holoinstall/post_install/pkgs_addon
 
 # Download Kernels
-wget $(pacman -Sp linux-neptune-61) -P /etc/holoinstall/post_install/pkgs
-wget $(pacman -Sp linux-neptune-61-headers) -P /etc/holoinstall/post_install/pkgs
+# wget $(pacman -Sp linux-neptune-61) -P /etc/holoinstall/post_install/pkgs
+# wget $(pacman -Sp linux-neptune-61-headers) -P /etc/holoinstall/post_install/pkgs
+wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-6.1.12.valve2-1-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
+wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-headers-6.1.12.valve2-1-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
+
 
 # Workaround mkinitcpio bullshit so that i don't KMS after rebuilding ISO each time and having users reinstalling their fucking OS bullshit every goddamn time.
 rm /etc/mkinitcpio.conf

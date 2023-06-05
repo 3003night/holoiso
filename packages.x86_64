@@ -46,6 +46,8 @@ libfido2
 libusb-compat
 linux-neptune-61
 linux-neptune-61-headers
+linux-neptune
+linux-neptune-headers
 linux-atm
 linux-firmware
 linux-firmware-marvell
@@ -254,3 +256,18 @@ xorg-xhost
 xorg-xwininfo
 xterm
 zip
+
+# add 
+grub-btrfs
+os-prober
+snapper
+gparted
+expac
+fcitx5
+fcitx5-chinese-addons
+fcitx5-configtool
+fcitx5-gtk
+fcitx5-material-color
+fcitx5-pinyin-zhwiki
+fcitx5-qt
+htop
