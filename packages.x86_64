@@ -179,7 +179,6 @@ kexec-tools
 kjs
 kpeoplevcard
 lib32-flac
-lib32-gamescope
 lib32-libasyncns
 lib32-libice
 lib32-libnm
@@ -239,7 +238,6 @@ pyzy
 qt5-feedback
 renderdoc-minimal
 ripgrep
-steam_notif_daemon
 steamos-devkit-service
 strace
 tk
