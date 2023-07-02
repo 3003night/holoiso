@@ -19,7 +19,7 @@ chmod 755 /etc/skel/Desktop/install-ext.desktop
 rm /home/${LIVEOSUSER}/steam.desktop
 
 # Add a liveOS user
-ROOTPASS="holoconfig"
+ROOTPASS="123"
 LIVEOSUSER="liveuser"
 
 echo -e "${ROOTPASS}\n${ROOTPASS}" | passwd root
@@ -50,15 +50,17 @@ systemctl enable sddm NetworkManager systemd-timesyncd cups bluetooth sshd
 
 # Download extra stuff
 mkdir -p /etc/holoinstall/post_install/pkgs
+# mkdir -p /etc/holoinstall/post_install/kernels
 wget $(pacman -Sp win600-xpad-dkms) -P /etc/holoinstall/post_install/pkgs_addon
 wget $(pacman -Sp linux-firmware-neptune) -P /etc/holoinstall/post_install/pkgs_addon
 
 # Download Kernels
-# wget $(pacman -Sp linux-neptune-61) -P /etc/holoinstall/post_install/pkgs
-# wget $(pacman -Sp linux-neptune-61-headers) -P /etc/holoinstall/post_install/pkgs
-wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-6.1.12.valve2-1-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
-wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-headers-6.1.12.valve2-1-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
-
+wget $(pacman -Sp linux-neptune-61) -P /etc/holoinstall/post_install/pkgs
+wget $(pacman -Sp linux-neptune-61-headers) -P /etc/holoinstall/post_install/pkgs
+wget $(pacman -Sp core-main/linux-lts) -P /etc/holoinstall/post_install/pkgs
+wget $(pacman -Sp core-main/linux-lts-headers) -P /etc/holoinstall/post_install/pkgs
+# wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-6.1.12.valve2-2-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
+# wget https://steamdeck-packages.steamos.cloud/archlinux-mirror/jupiter-main/os/x86_64/linux-neptune-61-headers-6.1.12.valve2-2-x86_64.pkg.tar.zst -P /etc/holoinstall/post_install/pkgs
 
 # Workaround mkinitcpio bullshit so that i don't KMS after rebuilding ISO each time and having users reinstalling their fucking OS bullshit every goddamn time.
 rm /etc/mkinitcpio.conf
@@ -66,11 +68,8 @@ mv /etc/mkinitcpio.conf.pacnew /etc/mkinitcpio.conf
 rm /etc/mkinitcpio.d/* # This removes shitty unasked presets so that this thing can't overwrite it next time
 mkdir -p /etc/mkinitcpio.d
 
-# New HWSupport test packages
-pacman -Syu --noconfirm mesa lib32-mesa lib32-vulkan-intel lib32-vulkan-radeon vulkan-intel vulkan-radeon libva-mesa-driver lib32-libva-mesa-driver --config /etc/holoinstall/pre_install/testpacman.conf
-
 # Remove this shit from post-build
 rm -rf /etc/holoinstall/pre_install
 rm /etc/pacman.conf
 mv /etc/pacold /etc/pacman.conf
-rm /home/.steamos/offload/var/cache/pacman/pkg/*
+# rm /home/.steamos/offload/var/cache/pacman/pkg/*
