@@ -29,10 +29,10 @@ jobs:
 
       - name: Build ISO File
         run: |
-          # cp mkarchiso-holoiso /usr/bin
-          # chmod +x /usr/bin/mkarchiso-holoiso
-          # mkarchiso-holoiso -v .
-          mkarchiso -v -w work -o out .
+          cp mkarchiso-holoiso /usr/bin
+          chmod +x /usr/bin/mkarchiso-holoiso
+          mkarchiso-holoiso -v .
+          # mkarchiso -v -w work -o out .
           find out/
 
       - uses: actions/upload-artifact@v2
