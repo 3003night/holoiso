@@ -12,9 +12,10 @@ on:
 jobs:
   build:
     runs-on: self-hosted
-    container:
-      image: thevakhovske/holoiso:latest
-      options: --privileged
+    # container:
+    #   image: thevakhovske/holoiso:latest
+    #   options: --privileged
+    container: archlinux:base-devel
     steps:
       - uses: actions/checkout@v2
 
