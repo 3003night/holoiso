@@ -38,8 +38,8 @@ jobs:
           mkdir -p efiboot/loader/entries
           ./gen_entries.sh .
 
-          mkarchiso-holoiso -v .
-          # mkarchiso -v -w work -o out .
+          # mkarchiso-holoiso -v .
+          mkarchiso -v -w work -o out .
           find out/
 
       - uses: actions/upload-artifact@v2
