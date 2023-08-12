@@ -1,13 +1,13 @@
 name: Build ISO self-hosted
 
 on:
-  push:
-      paths-ignore:
-      - '**.md'
-  pull_request:
-        paths-ignore:
-        - '**.md'
   workflow_dispatch:
+  # push:
+  #     paths-ignore:
+  #     - '**.md'
+  # pull_request:
+  #       paths-ignore:
+  #       - '**.md'
   
 
 jobs:

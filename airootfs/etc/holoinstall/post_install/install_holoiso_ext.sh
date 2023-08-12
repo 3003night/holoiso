@@ -486,14 +486,14 @@ base_os_install() {
 
     echo "配置首次启动的用户账户..."
     rm ${HOLO_INSTALL_DIR}/etc/skel/Desktop/*
-    arch-chroot ${HOLO_INSTALL_DIR} rm /etc/sddm.conf.d/* 
-    mv /etc/holoinstall/post_install_shortcuts/steam.desktop /etc/holoinstall/post_install_shortcuts/desktopshortcuts.desktop ${HOLO_INSTALL_DIR}/etc/xdg/autostart
+    arch-chroot ${HOLO_INSTALL_DIR} rm /etc/sddm.conf.d/*
+    mv /etc/holoinstall/post_install_shortcuts/steam.desktop ${HOLO_INSTALL_DIR}/etc/xdg/autostart
     mv /etc/holoinstall/post_install_shortcuts/steamos-gamemode.desktop ${HOLO_INSTALL_DIR}/etc/skel/Desktop    
     echo "\nCreating user ${HOLOUSER}..."
     echo -e "${ROOTPASS}\n${ROOTPASS}" | arch-chroot ${HOLO_INSTALL_DIR} passwd root
     arch-chroot ${HOLO_INSTALL_DIR} useradd --create-home ${HOLOUSER}
     echo -e "${HOLOPASS}\n${HOLOPASS}" | arch-chroot ${HOLO_INSTALL_DIR} passwd ${HOLOUSER}
-    echo "${HOLOUSER} ALL=(root) NOPASSWD:ALL" > ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
+    echo "${HOLOUSER} ALL=(ALL:ALL) ALL" > ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
     chmod 0440 ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
     echo "127.0.1.1    ${HOLOHOSTNAME}" >> ${HOLO_INSTALL_DIR}/etc/hosts
 
@@ -520,12 +520,10 @@ base_os_install() {
 
     echo "安装软件包......"
     arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
-    # arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm mkinitcpio-archiso
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm $(cat /etc/holoinstall/post_install/kernel_list.bootstrap)
     arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
     arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
-    # arch-chroot ${HOLO_INSTALL_DIR} rm -f $(find /etc/holoinstall/post_install/pkgs | grep linux-neptune)
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs | grep pkg.tar.zst)
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/kernels | grep pkg.tar.zst)
 
 }
 full_install() {
@@ -540,6 +538,11 @@ full_install() {
         arch-chroot ${HOLO_INSTALL_DIR} sed -i 's/\(HOOKS=.*k\)/\1 resume/' /etc/mkinitcpio.conf
         arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
     fi
+    if [[ -n "$(lspci -nn | grep -i vga | grep -Po "10de:[a-z0-9]{4}")" ]]; then
+		echo "NVIDIA GPU detected. Installing NVIDIA Drivers."
+		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs/nv | grep pkg.tar.zst)
+		arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
+	fi
     echo "\n默认配置Steam Deck用户界面..."        
     ln -s /usr/share/applications/steam.desktop ${HOLO_INSTALL_DIR}/etc/skel/Desktop/steam.desktop
     echo -e "[General]\nDisplayServer=wayland\n\n[Autologin]\nUser=${HOLOUSER}\nSession=gamescope-wayland.desktop\nRelogin=true\n\n[X11]\n# Janky workaround for wayland sessions not stopping in sddm, kills\n# all active sddm-helper sessions on teardown\nDisplayStopCommand=/usr/bin/gamescope-wayland-teardown-workaround" >> ${HOLO_INSTALL_DIR}/etc/sddm.conf.d/autologin.conf
@@ -554,6 +557,9 @@ full_install() {
 
 
     echo "准备 Steam OOBE..."
+    arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} mkdir -p ~/.local/share/Steam
+	arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} tar xf /usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz -C ~/.local/share/Steam
+	arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} touch ~/.steam/steam/.cef-enable-remote-debugging
     arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
     echo "清理..."
     cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
