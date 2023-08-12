@@ -32,6 +32,11 @@ jobs:
         run: |
           cp mkarchiso-holoiso /usr/bin
           chmod +x /usr/bin/mkarchiso-holoiso
+
+          rm -rf efiboot/loader/entries
+          mkdir -p efiboot/loader/entries
+          ./gen_entries.sh .
+
           mkarchiso-holoiso -v .
           # mkarchiso -v -w work -o out .
           find out/
