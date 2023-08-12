@@ -12,10 +12,10 @@ on:
 jobs:
   build:
     runs-on: self-hosted
-    # container:
-    #   image: thevakhovske/holoiso:latest
-    #   options: --privileged
-    container: archlinux:base-devel
+    container:
+      image: thevakhovske/holoiso:latest
+      options: --privileged
+    # container: archlinux:base-devel
     steps:
       - uses: actions/checkout@v2
 
@@ -36,7 +36,7 @@ jobs:
           rm -rf efiboot/loader/entries
           mkdir -p efiboot/loader/entries
           ./gen_entries.sh .
-          
+
           mkarchiso-holoiso -v .
           find out/
 
