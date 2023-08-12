@@ -233,7 +233,7 @@ xargs -0 zenity --list --width=600 --height=512 --title="Select disk" --text="Se
 	# If the available storage is less than 64GB, don't create /home.
 	# If the boot device is mmcblk0, don't create an ext4 partition or it will break steamOS versions
 	# released after May 20.
-	if [ $diskSpace -lt 64000000 ] || [[ "${DEVICE}" =~ mmcblk0 ]]; then
+	if [[ "${DEVICE}" =~ mmcblk0 ]]; then
 		parted ${DEVICE} mkpart primary btrfs ${rootStart}M 100%
 	else
 		parted ${DEVICE} mkpart primary btrfs ${rootStart}M ${rootEnd}M
@@ -286,9 +286,9 @@ base_os_install() {
 	arch-chroot ${HOLO_INSTALL_DIR} rm /etc/polkit-1/rules.d/99_holoiso_installuser.rules
 	cp -r /etc/holoinstall/post_install/pacman.conf ${HOLO_INSTALL_DIR}/etc/pacman.conf
 	arch-chroot ${HOLO_INSTALL_DIR} pacman-key --init
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-neptune-61 linux-neptune-61-headers mkinitcpio-archiso
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm $(cat /etc/holoinstall/post_install/kernel_list.bootstrap)
 	arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
-    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs | grep pkg.tar.zst)
+    arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/kernels | grep pkg.tar.zst)
 
 	arch-chroot ${HOLO_INSTALL_DIR} userdel -r liveuser
 	check_download $? "installing base package"
@@ -305,13 +305,13 @@ base_os_install() {
     echo "Configuring first boot user accounts..."
 	rm ${HOLO_INSTALL_DIR}/etc/skel/Desktop/*
     arch-chroot ${HOLO_INSTALL_DIR} rm /etc/sddm.conf.d/* 
-	mv /etc/holoinstall/post_install_shortcuts/steam.desktop /etc/holoinstall/post_install_shortcuts/desktopshortcuts.desktop ${HOLO_INSTALL_DIR}/etc/xdg/autostart
+	mv /etc/holoinstall/post_install_shortcuts/steam.desktop ${HOLO_INSTALL_DIR}/etc/xdg/autostart
     mv /etc/holoinstall/post_install_shortcuts/steamos-gamemode.desktop ${HOLO_INSTALL_DIR}/etc/skel/Desktop	
 	echo "\nCreating user ${HOLOUSER}..."
 	echo -e "${ROOTPASS}\n${ROOTPASS}" | arch-chroot ${HOLO_INSTALL_DIR} passwd root
 	arch-chroot ${HOLO_INSTALL_DIR} useradd --create-home ${HOLOUSER}
 	echo -e "${HOLOPASS}\n${HOLOPASS}" | arch-chroot ${HOLO_INSTALL_DIR} passwd ${HOLOUSER}
-	echo "${HOLOUSER} ALL=(root) NOPASSWD:ALL" > ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
+	echo "${HOLOUSER} ALL=(ALL:ALL) ALL" > ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
 	chmod 0440 ${HOLO_INSTALL_DIR}/etc/sudoers.d/${HOLOUSER}
 	echo "127.0.1.1    ${HOLOHOSTNAME}" >> ${HOLO_INSTALL_DIR}/etc/hosts
 	sleep 1
@@ -327,14 +327,15 @@ base_os_install() {
 	clear
 }
 full_install() {
-	if [[ "${GAMEPAD_DRV}" == "1" ]]; then
-		echo "You're running this on Anbernic Win600. A suitable gamepad driver will be installed."
-		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs_addon | grep win600-xpad-dkms)
-	fi
 	if [[ "${FIRMWARE_INSTALL}" == "1" ]]; then
 		echo "You're running this on a Steam Deck. linux-firmware-neptune will be installed to ensure maximum kernel-side compatibility."
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -Rdd --noconfirm linux-firmware
 		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs_addon | grep linux-firmware-neptune)
+		arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
+	fi
+	if [[ -n "$(lspci -nn | grep -i vga | grep -Po "10de:[a-z0-9]{4}")" ]]; then
+		echo "NVIDIA GPU detected. Installing NVIDIA Drivers."
+		arch-chroot ${HOLO_INSTALL_DIR} pacman -U --noconfirm $(find /etc/holoinstall/post_install/pkgs/nv | grep pkg.tar.zst)
 		arch-chroot ${HOLO_INSTALL_DIR} mkinitcpio -P
 	fi
 	echo "\nConfiguring Steam Deck UI by default..."		
@@ -343,6 +344,9 @@ full_install() {
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G rfkill ${HOLOUSER}
 	arch-chroot ${HOLO_INSTALL_DIR} usermod -a -G wheel ${HOLOUSER}
 	echo "Preparing Steam OOBE..."
+	arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} mkdir -p ~/.local/share/Steam
+	arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} tar xf /usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz -C ~/.local/share/Steam
+	arch-chroot ${HOLO_INSTALL_DIR} sudo -u ${HOLOUSER} touch ~/.steam/steam/.cef-enable-remote-debugging
 	arch-chroot ${HOLO_INSTALL_DIR} touch /etc/holoiso-oobe
 	echo "Cleaning up..."
 	cp /etc/skel/.bashrc ${HOLO_INSTALL_DIR}/home/${HOLOUSER}
