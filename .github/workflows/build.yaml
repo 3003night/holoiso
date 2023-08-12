@@ -18,9 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Sanity check, if we are on SteamOS environment
-        run: |
-          cat /etc/os-release          
+      # - name: Sanity check, if we are on SteamOS environment
+      #   run: |
+      #     cat /etc/os-release          
       
       - name: Install ArchISO
         run: |
